@@ -1,4 +1,4 @@
-const C = 'tick-v2';
+const C = 'tick-v3';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => {
   e.waitUntil(

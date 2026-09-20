@@ -175,14 +175,17 @@ let view='today',curDay=today();
 let ver=0,memo={},memoVer=-1;     // ver bumps whenever data changes; caches key off it
 let saveT;
 const save=()=>{idxDirty=true;ver++;localStorage.setItem(KEY,JSON.stringify(S));clearTimeout(saveT);saveT=setTimeout(sync,1200);};
-const goalsList=()=>Object.values(S.goals).filter(g=>!g.deleted).sort((a,b)=>a.order-b.order);
+// g.off = periods when a goal is retired/paused: [{from, to|null}]. days inside them don't count and don't show.
+const isRetired=g=>!!(g.off&&g.off.some(o=>!o.to));
+const goalsList=()=>Object.values(S.goals).filter(g=>!g.deleted&&!isRetired(g)).sort((a,b)=>a.order-b.order);          // what you're doing now
+const historyGoals=()=>Object.values(S.goals).filter(g=>!g.deleted).sort((a,b)=>a.order-b.order);                       // includes retired ones
 const prune=()=>{idxDirty=true;ver++;const cut=Date.now()-S.meta.keepDays*864e5,cd=dk(cut);
   for(const[k,s]of Object.entries(S.sessions))if(s.end<cut)delete S.sessions[k];
   for(const[k,c]of Object.entries(S.checks))if(c.date<cd)delete S.checks[k];};
 
 /* ---------- goal targets (versioned by date, so changing a target never rewrites history) ---------- */
 const entryFor=(g,d)=>{let e=null;for(const h of g.history)if(h.from<=d)e=h;return e;};
-const targetFor=(g,d)=>{if(d<g.created)return null;const e=entryFor(g,d);if(!e)return null;
+const targetFor=(g,d)=>{if(d<g.created)return null;for(const o of g.off||[])if(d>=o.from&&(!o.to||d<=o.to))return null;const e=entryFor(g,d);if(!e)return null;
   return{minutes:e.minutes,days:e.days,pool:!!e.pool,times:e.times||0,on:e.days.includes(parseD(d).getDay())};};
 const weekStart=d=>addDays(d,-((parseD(d).getDay()+6)%7));   // weeks run mon-sun
 const daysLabel=days=>{const k=[...days].sort().join('');
@@ -391,7 +394,7 @@ const addMonth=(s,n)=>{const[y,m]=s.split('-').map(Number),d=new Date(y,m-1+n,1)
 function viewHistory(){
   const t=today();if(!calMonth)calMonth=t.slice(0,7);
   const[y,m]=calMonth.split('-').map(Number),n=new Date(y,m,0).getDate(),lead=(new Date(y,m-1,1).getDay()+6)%7;
-  const gs=goalsList();
+  const gs=historyGoals();
   let cells='';for(let i=0;i<lead;i++)cells+='<span class="cell blank"></span>';
   for(let day=1;day<=n;day++){
     const d=y+'-'+p2(m)+'-'+p2(day),fut=d>t;
@@ -406,14 +409,14 @@ function viewHistory(){
 }
 function daySheet(d){
   dayCtx=d;const t=today();
-  const lines=goalsList().map(g=>dayLine(g,d)).join('')||'<div class="dim small">nothing scheduled.</div>';
+  const lines=historyGoals().map(g=>dayLine(g,d)).join('')||'<div class="dim small">nothing scheduled.</div>';
   openSheet(`<h2>${dLabel(d)}${d===t?' (today)':''}</h2><div style="margin-bottom:6px">${lines}</div>${daySessionsHtml(d)}<div class="btns"><button data-act="close">close</button></div>`);
   sheetIsDay=true;
 }
 const afterEdit=()=>{if(dayCtx)daySheet(dayCtx);else closeSheet();};
 function daySessionsHtml(d){
   const hasTimer=goalsList().some(g=>!isMark(g));
-  const checks=goalsList().filter(g=>isMark(g)&&d>=g.created).map(g=>{const dn=isDone(g.id,d),av=g.kind==='avoid';
+  const checks=historyGoals().filter(g=>isMark(g)&&targetFor(g,d)).map(g=>{const dn=isDone(g.id,d),av=g.kind==='avoid';
     return `<button class="ses" data-act="chk" data-g="${g.id}" data-d="${d}"><span>${av?(dn?'[\u2717]':'[ ]'):(dn?'[\u2713]':'[ ]')} ${esc(g.name)}</span><span class="dim small">${av?(dn?'slipped \u2014 tap to undo':'clean \u2014 tap to mark a slip'):(dn?'tap to undo':'tap to mark done')}</span></button>`;}).join('');
   const list=daySessions(d).map(s=>{
     const cross=dk(s.end-1)!==dk(s.start);
@@ -433,10 +436,13 @@ function viewGoals(){
       :e.minutes?e.minutes+'m '+(e.pool?'total across ':'each ')+daysLabel(e.days):'tracked only';
     return `<div class="grow"><button class="gedit" data-act="editgoal" data-g="${g.id}"><span>${esc(g.name)}</span><span class="dim small">${sum}${g.created>today()?' \u00B7 starts '+dLabel(g.created):''}</span></button><button class="mv" data-act="up" data-g="${g.id}"${i===0?' disabled':''} aria-label="move up">\u2191</button><button class="mv" data-act="down" data-g="${g.id}"${i===gl.length-1?' disabled':''} aria-label="move down">\u2193</button></div>`;
   }).join('');
+  const gone=historyGoals().filter(isRetired);
+  const retiredHtml=gone.length?`<div class="sec"><div class="dim small" style="margin-bottom:6px">retired</div>${gone.map(g=>{const o=(g.off||[]).find(x=>!x.to);
+    return `<div class="grow"><button class="gedit" data-act="editretired" data-g="${g.id}"><span class="dim">${esc(g.name)}</span><span class="dim small">retired ${dLabel(o.from)} \u00B7 history kept</span></button></div>`;}).join('')}</div>`:'';
   const sync=D.refresh
     ?`<div>dropbox connected <span class="dim">${esc(D.path)}</span></div><div class="btns" style="margin-top:12px"><button data-act="sync">sync now</button><button class="danger" data-act="disc">disconnect</button></div><div class="dim small syncline" style="margin-top:12px"></div>`
     :`<div class="dim">not synced \u2014 data lives on this device only.</div><div class="btns" style="margin-top:12px"><button data-act="connect">connect dropbox</button></div>`;
-  return `<div class="sec">${rows||'<p class="dim">no goals yet.</p>'}${rows?'<p class="dim small" style="margin:8px 0 0">tap a goal to edit or delete it. arrows reorder.</p>':''}<button class="link" data-act="newgoal" style="margin-top:14px">+ add goal</button></div>
+  return `<div class="sec">${rows||'<p class="dim">no goals yet.</p>'}${rows?'<p class="dim small" style="margin:8px 0 0">tap a goal to edit or delete it. arrows reorder.</p>':''}<button class="link" data-act="newgoal" style="margin-top:14px">+ add goal</button></div>${retiredHtml}
 <div class="sec"><label for="keep" style="margin:0">keep history (days)</label><input id="keep" type="number" inputmode="numeric" min="7" max="3650" value="${S.meta.keepDays}"><p class="dim small" style="margin:8px 0 0">older days are deleted for good. back up first if you want to keep them.</p></div>
 <div class="sec"><div>backup</div><p class="dim small" style="margin:6px 0 0">a backup file holds all your goals, sessions and marks (no dropbox login). restore reads one back.</p><div class="btns" style="margin-top:12px"><button data-act="exportjson">export backup</button><button data-act="restore">restore backup</button><button data-act="exportcsv">export csv</button>${undoBtn()}</div></div>
 <div class="sec">${sync}</div>`;
@@ -521,16 +527,16 @@ ${g?'':`<label>type</label><div class="modes"><button class="kopt on" data-act="
 ${canMove?`<label for="g-start">starts</label><input id="g-start" type="date" min="${t0}" value="${startVal}"><p class="dim small" style="margin-top:8px"><button class="link" data-act="startset" data-o="0">today</button> &nbsp; <button class="link" data-act="startset" data-o="1">tomorrow</button> &nbsp; pick tomorrow to leave today out.</p>`:''}
 ${g&&!canMove?'<p class="dim small" style="margin-top:14px">changes apply from today. past days keep the old settings.</p>':''}
 <div class="err"></div>
-<div class="btns"><button class="go" data-act="savegoal" data-g="${g?g.id:''}">save</button><button data-act="close">cancel</button>${g?`<button class="danger" data-act="delgoal" data-g="${g.id}">delete</button>`:''}</div>`);
+<div class="btns"><button class="go" data-act="savegoal" data-g="${g?g.id:''}">save</button><button data-act="close">cancel</button>${g?`<button data-act="retire" data-g="${g.id}">retire</button><button class="danger" data-act="delgoal" data-g="${g.id}">delete</button>`:''}</div>`);
   sheet.dataset.kind=kind;sheet.dataset.mode=mode;
 }
 
 function sessionSheet(id,dateHint,note){
-  const gs=goalsList().filter(g=>!isMark(g));if(!gs.length)return;
+  const gs=historyGoals().filter(g=>!isMark(g));if(!gs.length)return;
   const s=id&&S.sessions[id];let st,en,gid;
   if(s){st=s.start;en=s.end;gid=s.goalId;}
   else{
-    gid=gs[0].id;
+    gid=(gs.find(g=>!isRetired(g))||gs[0]).id;
     if(!dateHint||dateHint===today()){en=Math.floor(Date.now()/60000)*60000;st=en-30*60000;}
     else{st=dayBounds(dateHint)[0]+9*3600000;en=st+30*60000;}
   }
@@ -543,8 +549,8 @@ ${note?`<p class="dim small">${esc(note)}</p>`:''}
 <div class="btns"><button class="go" data-act="saveses" data-id="${s?s.id:''}">save</button><button data-act="close">cancel</button>${s?`<button class="danger" data-act="delses" data-id="${s.id}">delete</button>`:''}</div>`);
 }
 
-function confirmSheet(msg,yesAct,attrs,yesLabel){
-  openSheet(`<h2>are you sure?</h2><p>${msg}</p><div class="btns"><button class="danger" data-act="${yesAct}" ${attrs}>${yesLabel}</button><button data-act="close">keep it</button></div>`);
+function confirmSheet(msg,yesAct,attrs,yesLabel,cls){
+  openSheet(`<h2>are you sure?</h2><p>${msg}</p><div class="btns"><button class="${cls||'danger'}" data-act="${yesAct}" ${attrs}>${yesLabel}</button><button data-act="close">keep it</button></div>`);
 }
 function moveGoal(id,dir){
   const gs=goalsList(),i=gs.findIndex(g=>g.id===id),j=i+dir;if(i<0||j<0||j>=gs.length)return;
@@ -617,6 +623,30 @@ const H={
     $('#mode-help').textContent=a.dataset.k==='check'?MODE_HELP.set:MODE_HELP.each;
   },
   startset(a){const d=addDays(today(),+a.dataset.o),i=$('#g-start');if(i)i.value=d;},
+  retire(a){
+    const g=S.goals[a.dataset.g];if(!g)return;
+    confirmSheet(`retire <b>${esc(g.name)}</b>? it leaves today and stops counting from today. its past days stay in the calendar, and you can bring it back any time.`,'retireyes',`data-g="${g.id}"`,'yes, retire','go');
+  },
+  retireyes(a){
+    const g=S.goals[a.dataset.g];if(!g)return;
+    if(S.active.goalId===g.id)stopActive();
+    g.off=(g.off||[]).filter(o=>o.to);g.off.push({from:today(),to:null});
+    g.updatedAt=Math.max(Date.now(),g.updatedAt+1);
+    closeSheet();save();render();flash(g.name+' retired');
+  },
+  editretired(a){
+    const g=S.goals[a.dataset.g];if(!g)return;
+    const o=(g.off||[]).find(x=>!x.to);
+    openSheet(`<h2>${esc(g.name)}</h2><p class="dim small">retired ${o?dLabel(o.from):''}. its history stays in the calendar.</p>
+<div class="btns"><button class="go" data-act="unretire" data-g="${g.id}">bring back</button><button class="danger" data-act="delgoal" data-g="${g.id}">delete forever</button><button data-act="close">close</button></div>`);
+  },
+  unretire(a){
+    const g=S.goals[a.dataset.g];if(!g)return;
+    const y=addDays(today(),-1);           // the days it was away stay out of the record
+    g.off=(g.off||[]).map(o=>o.to?o:{from:o.from,to:y}).filter(o=>o.to>=o.from);
+    g.updatedAt=Math.max(Date.now(),g.updatedAt+1);
+    closeSheet();save();render();flash(g.name+' is back');
+  },
   nudgeyes(a){
     const g=S.goals[a.dataset.g],n=g&&nudgeFor(g);closeSheet();if(!n)return;
     const t=today(),tm=addDays(t,1);
@@ -770,7 +800,7 @@ function exportCsv(){
   let first=t;for(const g of gs)if(g.created<first)first=g.created;
   if(first<lim)first=lim;
   for(let d=first;d<=t;d=addDays(d,1))for(const g of gs){
-    if(d<g.created)continue;
+    if(d<g.created||!status(g,d))continue;
     rows.push([d,csvq(g.name),g.kind||'timer',isMark(g)?'':mins(dayMs(g.id,d)),isMark(g)?(isDone(g.id,d)?1:0):'',dayResult(g,d)].join(','));
   }
   saveFile('tick-'+t+'.csv',rows.join('\n'),'text/csv');
@@ -788,7 +818,7 @@ function cleanBackup(o){       // keep only well-formed entries
   for(const g of Object.values(o.goals||{})){
     if(g&&typeof g.id==='string'&&typeof g.name==='string'&&ISO.test(g.created||'')&&Array.isArray(g.history)&&g.history.length
        &&g.history.every(x=>x&&ISO.test(x.from||'')&&Array.isArray(x.days)&&Number.isFinite(x.minutes)))
-      out.goals[g.id]={...g,order:+g.order||0,updatedAt:+g.updatedAt||0};
+      out.goals[g.id]={...g,order:+g.order||0,updatedAt:+g.updatedAt||0,off:Array.isArray(g.off)?g.off.filter(o=>o&&ISO.test(o.from||'')&&(!o.to||ISO.test(o.to))):[]};
     else out.skipped++;
   }
   for(const s of Object.values(o.sessions||{})){

@@ -50,6 +50,9 @@ weeks run Monday to Sunday. the day rolls over at local midnight. changing a goa
 
 **level-up prompt:** after 3 weeks in a row of success on a timer or limit goal, tick asks whether to raise the goal (or lower the limit) by about 10%. yes takes effect tomorrow. no means it asks again in 3 weeks. it never interrupts a running timer.
 
+**retiring a goal:** goals → tap the goal → **retire**. it leaves today and stops counting from today, but every past day stays in the calendar, day view and exports. retired goals sit under *retired* in the goals tab, where you can **bring back** (the days it was away stay out of the record) or delete forever. *delete* on a live goal removes it from history too.
+
+
 ## backup and restore
 
 goals → **export backup** saves one JSON file (no Dropbox login inside). **restore backup** offers *merge* (adds what's missing, keeps your newer edits and deletions) or *replace* (makes everything match the file, with an undo). **export csv** writes one row per day per goal for spreadsheets.
