@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="tick">
+<meta name="theme-color" content="#0c0c0c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>tick</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0c0c0c;--fg:#cfcfcf;--dim:#707070;--faint:#262626;--line:#3a3a3a;--green:#86c98a;--red:#a26a6a;color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.55 'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;-webkit-text-size-adjust:100%;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;text-align:left}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:1px solid var(--dim);outline-offset:2px}
+#app{max-width:480px;margin:0 auto;padding:20px 18px 80px}
+.brand{font-size:12px;color:var(--dim);margin-bottom:16px}
+.brand b{color:var(--fg);font-weight:500;font-size:15px}
+.top{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--dim);margin-bottom:24px}
+.nav button{margin-left:16px;color:var(--dim)}
+.nav button.on{color:var(--fg)}
+.dim{color:var(--dim)}
+.small{font-size:12px}
+.link{color:var(--dim);font-size:12px}
+.link:hover{color:var(--fg)}
+p{margin:0 0 12px}
+
+/* goal rows */
+.goal{display:block;width:100%;min-height:100px;border:1px solid var(--faint);border-radius:2px;padding:24px 18px 22px;margin-bottom:18px;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.goal.run{border-color:#5a5a5a}
+.goal.met{color:var(--green);border-color:#2e4630}
+.g-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.g-name{font-size:18px}
+.g-meta{color:var(--dim);font-size:13px;text-align:right}
+.goal.met .g-meta{color:var(--green)}
+.box{font-weight:400;color:var(--dim)}
+.goal.run .box{color:var(--fg)}
+.goal.met .box{color:var(--green)}
+.g-clock{display:none;font-size:38px;font-weight:300;letter-spacing:.02em;margin:14px 0 0}
+.goal.run .g-clock{display:block}
+.g-total{font-size:12px;color:var(--dim);margin-top:14px}
+.goal.met .g-total{color:var(--green)}
+.bar{height:3px;background:var(--faint);margin-top:8px}
+.bar i{display:block;height:100%;width:0;background:#777;transition:width .4s}
+.goal.met .bar i{background:var(--green)}
+.foot{margin-top:22px}
+
+/* history + goals lists */
+.dr{border-bottom:1px solid var(--faint);padding:12px 0}
+.dh{display:flex;justify-content:space-between;width:100%;color:var(--dim);font-size:12px;margin-bottom:4px}
+.hl{display:flex;justify-content:space-between}
+.ok{color:var(--green)}
+.miss{color:var(--red)}
+.ses-list{margin-top:10px;padding-top:10px;border-top:1px dashed var(--faint)}
+.ses{display:flex;justify-content:space-between;gap:12px;width:100%;padding:5px 0;font-size:13px}
+.ses:hover{color:#fff}
+.sec{border-bottom:1px solid var(--faint);padding:14px 0 16px}
+.sec:first-child{padding-top:0}
+#keep{width:110px;margin-top:6px}
+.grow{display:flex;align-items:center;border-bottom:1px solid var(--faint)}
+.grow:last-of-type{border-bottom:0}
+.gedit{flex:1;display:flex;flex-direction:column;padding:14px 0;min-width:0}
+.mv{width:48px;height:48px;text-align:center;color:var(--fg);font-size:18px}
+.mv:disabled{opacity:.2;cursor:default}
+.modes{display:flex;gap:6px}
+.opt,.kopt{flex:1;text-align:center;border:1px solid var(--faint);padding:10px 0;color:var(--dim);font-size:12px}
+.opt.on,.kopt.on{color:var(--fg);border-color:#666}
+#sheet[data-kind=check] .only-timer,#sheet[data-kind=avoid] .only-timer{display:none}
+#sheet[data-kind=avoid] .no-avoid{display:none}
+#sheet[data-kind=check] .mg-timer,#sheet[data-kind=avoid] .mg-timer{display:none}
+#sheet:not([data-kind=check]) .mg-check{display:none}
+.only-count{display:none}
+#sheet[data-mode=count] .only-count{display:block}
+#sheet[data-mode=count] .only-days{display:none}
+/* calendar */
+.calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.calttl{flex:1;text-align:center;font-size:15px;padding:10px 0}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.wd{color:var(--dim);font-size:11px;text-align:center;padding:4px 0}
+.cell{display:flex;flex-direction:column;align-items:center;min-height:58px;border:1px solid var(--faint);border-radius:2px;padding:6px 2px 4px;font-size:12px;color:var(--dim);text-align:center}
+.cell.blank{border:0}
+.cell.today{border-color:#777;color:var(--fg)}
+.cell:disabled{opacity:.3;cursor:default}
+.dots{display:flex;flex-wrap:wrap;justify-content:center;gap:3px;margin-top:6px}
+.dot{display:block;width:6px;height:6px;border-radius:50%;border:1px solid var(--line)}
+.dot.ok{background:var(--green);border-color:var(--green)}
+.dot.miss{background:var(--red);border-color:var(--red)}
+.g-note{font-size:12px;color:var(--dim);margin-top:8px}
+.g-note:empty{display:none}
+.goal.fail{border-color:#4a2f2f}
+.goal.fail .box{color:var(--red)}
+.goal.chk{min-height:84px}
+
+/* sheet */
+#sheet{position:fixed;inset:0;background:var(--bg);overflow:auto;padding:calc(24px + env(safe-area-inset-top)) 18px 40px;z-index:5}
+#sheet[hidden]{display:none}
+#sheet .in{max-width:480px;margin:0 auto}
+h2{font-size:14px;font-weight:500;margin:0 0 20px}
+label{display:block;color:var(--dim);font-size:12px;margin:18px 0 6px}
+input,select{width:100%;background:transparent;color:var(--fg);border:1px solid var(--line);border-radius:2px;padding:10px;font:inherit;font-size:16px}
+.days{display:flex;gap:6px}
+.day{flex:1;text-align:center;border:1px solid var(--faint);padding:9px 0;color:var(--dim);font-size:12px}
+.day.on{color:var(--fg);border-color:#666}
+.btns{display:flex;flex-wrap:wrap;gap:14px 24px;margin-top:26px}
+.go{color:var(--green)}
+.danger{color:var(--red)}
+.err{color:var(--red);font-size:12px;min-height:18px;margin-top:14px}
+.code{word-break:break-all;user-select:all;-webkit-user-select:all;border:1px solid var(--faint);padding:8px 10px;font-size:12px}
+
+/* transient message */
+#msg{position:fixed;left:0;right:0;bottom:calc(22px + env(safe-area-inset-bottom));text-align:center;color:var(--dim);font-size:12px;opacity:0;transition:opacity 1.4s ease;pointer-events:none;z-index:6}
+#msg.show{opacity:1;transition:opacity .25s ease}
+#msg.ok{color:var(--green)}
+#msg.bad{color:var(--red)}
+.goal.fail .bar i{background:var(--red)}
+#sheet[data-kind=limit] .no-avoid{display:none}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="sheet" hidden></div>
+<div id="msg"></div>
+<input type="file" id="restorefile" accept=".json,application/json" hidden>
+
+<script>
+(()=>{
+'use strict';
+
+/* ---------- constants ---------- */
+const KEY='tick_state_v1', DKEY='tick_dbx';
+const MIN_MS=10000;      // sessions shorter than this are discarded (accidental taps)
+const LONG_H=3;          // after stopping a session longer than this, open the editor
+const DOW=['sun','mon','tue','wed','thu','fri','sat'];
+const MON=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+const REDIRECT=location.origin+location.pathname;
+
+/* ---------- helpers ---------- */
+const $=s=>document.querySelector(s);
+const p2=n=>String(n).padStart(2,'0');
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const dk=ms=>{const d=new Date(ms);return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());};
+const today=()=>dk(Date.now());
+const parseD=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);};
+const dayBounds=s=>{const d=parseD(s);return[d.getTime(),new Date(d.getFullYear(),d.getMonth(),d.getDate()+1).getTime()];};
+const addDays=(s,n)=>{const d=parseD(s);d.setDate(d.getDate()+n);return dk(d.getTime());};
+const dtv=ms=>{const d=new Date(ms);return dk(ms)+'T'+p2(d.getHours())+':'+p2(d.getMinutes());};
+const hm=ms=>{const d=new Date(ms);return p2(d.getHours())+':'+p2(d.getMinutes());};
+const clock=ms=>{const s=Math.max(0,Math.floor(ms/1000));return p2(Math.floor(s/3600))+':'+p2(Math.floor(s%3600/60))+':'+p2(s%60);};
+const mins=ms=>Math.floor(ms/60000);
+const dLabel=s=>{const d=parseD(s);return DOW[d.getDay()]+' '+d.getDate()+' '+MON[d.getMonth()];};
+const canon=o=>JSON.stringify(o,(k,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.keys(v).sort().reduce((a,x)=>(a[x]=v[x],a),{}):v);
+const rid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+
+/* ---------- state ---------- */
+const norm=o=>{o=o||{};const a=o.active||{},m=o.meta||{};
+  return{goals:o.goals||{},sessions:o.sessions||{},checks:o.checks||{},
+    active:{goalId:a.goalId||null,start:a.start||null,updatedAt:a.updatedAt||0},
+    meta:{keepDays:m.keepDays||365,updatedAt:m.updatedAt||0}};};
+let S;try{S=norm(JSON.parse(localStorage.getItem(KEY)));}catch(e){S=norm();}
+let D;try{D=JSON.parse(localStorage.getItem(DKEY)||'{}');}catch(e){D={};}
+const dsave=()=>localStorage.setItem(DKEY,JSON.stringify(D));
+
+let view='today',curDay=today();
+let ver=0,memo={},memoVer=-1;     // ver bumps whenever data changes; caches key off it
+let saveT;
+const save=()=>{idxDirty=true;ver++;localStorage.setItem(KEY,JSON.stringify(S));clearTimeout(saveT);saveT=setTimeout(sync,1200);};
+const goalsList=()=>Object.values(S.goals).filter(g=>!g.deleted).sort((a,b)=>a.order-b.order);
+const prune=()=>{idxDirty=true;ver++;const cut=Date.now()-S.meta.keepDays*864e5,cd=dk(cut);
+  for(const[k,s]of Object.entries(S.sessions))if(s.end<cut)delete S.sessions[k];
+  for(const[k,c]of Object.entries(S.checks))if(c.date<cd)delete S.checks[k];};
+
+/* ---------- goal targets (versioned by date, so changing a target never rewrites history) ---------- */
+const entryFor=(g,d)=>{let e=null;for(const h of g.history)if(h.from<=d)e=h;return e;};
+const targetFor=(g,d)=>{if(d<g.created)return null;const e=entryFor(g,d);if(!e)return null;
+  return{minutes:e.minutes,days:e.days,pool:!!e.pool,times:e.times||0,on:e.days.includes(parseD(d).getDay())};};
+const weekStart=d=>addDays(d,-((parseD(d).getDay()+6)%7));   // weeks run mon-sun
+const daysLabel=days=>{const k=[...days].sort().join('');
+  if(k==='0123456')return 'daily';if(k==='12345')return 'weekdays';if(k==='06')return 'weekends';
+  return [1,2,3,4,5,6,0].filter(x=>days.includes(x)).map(x=>DOW[x]).join(' ');};
+
+/* ---------- time math ---------- */
+/* per-day minutes index: rebuilt only when sessions change, so lookups are O(1) */
+let idx={},idxDirty=true;
+function buildIdx(){
+  idx={};
+  for(const s of Object.values(S.sessions)){
+    if(s.deleted)continue;
+    let a=s.start;
+    while(a<s.end){
+      const d=dk(a),e=Math.min(s.end,dayBounds(d)[1]),m=idx[s.goalId]||(idx[s.goalId]={});
+      m[d]=(m[d]||0)+(e-a);a=e;
+    }
+  }
+  idxDirty=false;
+}
+function dayMs(gid,d){
+  if(idxDirty)buildIdx();
+  let t=(idx[gid]&&idx[gid][d])||0;
+  if(S.active.goalId===gid){const[a,b]=dayBounds(d),now=Date.now();t+=Math.max(0,Math.min(now,b)-Math.max(S.active.start,a));}
+  return t;
+}
+/* status of goal g on date d.
+   each-day goal: that day's minutes vs target.
+   week-total goal: minutes across the goal's selected days in the mon-sun week, up to and including d. */
+// a day "counts" toward an x-per-week goal when it's checked off (check goals) or reaches the daily target (timers)
+const counts=(g,d,tg)=>g.kind==='check'?isDone(g.id,d):dayMs(g.id,d)>=Math.max(1,tg.minutes)*60000;
+function status(g,d){
+  const tg=targetFor(g,d);if(!tg)return null;
+  if(g.kind==='avoid')return{tg,tgt:0,day:0,cum:0,pool:false,avoid:true,failed:isDone(g.id,d),met:false};
+  if(tg.times>0){
+    const ws=weekStart(d);let hits=0;
+    for(let i=0;i<7;i++){const wd=addDays(ws,i);if(wd>d)break;if(wd>=g.created&&counts(g,wd,tg))hits++;}
+    const chk=g.kind==='check',day=chk?0:dayMs(g.id,d),hit=counts(g,d,tg);
+    return{tg,tgt:chk?0:tg.minutes,day,cum:day,pool:false,count:true,check:chk,times:tg.times,hits,dayHit:hit,done:hit,met:hits>=tg.times};
+  }
+  if(g.kind==='check'){const done=isDone(g.id,d);return{tg,tgt:0,day:0,cum:0,pool:false,check:true,done,met:done};}
+  if(g.kind==='limit'){   // a cap: stay at or under it. going over is a fail, and it is decided the moment you cross it
+    const day=dayMs(g.id,d),on=tg.on&&tg.minutes>0;
+    return{tg,tgt:on?tg.minutes:0,limit:on?tg.minutes:0,day,cum:day,pool:false,over:on&&day>tg.minutes*60000,met:false};
+  }
+  const day=dayMs(g.id,d),tgt=tg.on&&tg.minutes>0?tg.minutes:0;
+  if(!tg.pool||!tgt)return{tg,tgt,day,cum:day,pool:false,met:!!(tgt&&day>=tgt*60000)};
+  const ws=weekStart(d);let cum=0,last=null;
+  for(let i=0;i<7;i++){const wd=addDays(ws,i);if(tg.days.includes(parseD(wd).getDay())){last=wd;if(wd<=d)cum+=dayMs(g.id,wd);}}
+  return{tg,tgt,day,cum,pool:true,last,met:cum>=tgt*60000};
+}
+
+/* consecutive successes. each-day goals count scheduled days (unscheduled days are skipped);
+   week-total goals count whole weeks. today never breaks a streak while it's still open. */
+function streakOf(g){
+  const t=today(),lim=addDays(t,-(S.meta.keepDays-1));
+  const e0=entryFor(g,t)||g.history[g.history.length-1];
+  if(!isMark(g)&&(!e0||(!e0.minutes&&!e0.times)))return{n:0,unit:'day'};
+  const weekly=!!e0&&(e0.times>0||(!isMark(g)&&e0.pool));
+  if(memoVer!==ver){memo={};memoVer=ver;}
+  const key=g.id+'|'+t;
+  let past=memo[key];
+  if(past===undefined){                      // completed days/weeks only; cached until data changes
+    past=0;
+    if(weekly){
+      let ws=addDays(weekStart(t),-7);
+      for(let i=0;i<600&&addDays(ws,6)>=g.created&&addDays(ws,6)>=lim;i++,ws=addDays(ws,-7)){
+        const ent=entryFor(g,addDays(ws,6));if(!ent)break;
+        let last=null;
+        for(let k=0;k<7;k++){const wd=addDays(ws,k);if(wd>=g.created&&ent.days.includes(parseD(wd).getDay()))last=wd;}
+        if(!last)continue;
+        const st=status(g,last);if(!st||!st.met)break;
+        past++;
+      }
+    }else{
+      for(let d=addDays(t,-1);d>=lim;d=addDays(d,-1)){
+        const tg=targetFor(g,d);if(!tg)break;
+        if(!tg.on)continue;
+        const st=status(g,d);
+        if(g.kind==='avoid'){if(st.failed)break;past++;continue;}
+        if(g.kind==='limit'){if(st.over)break;past++;continue;}
+        if(!st.met)break;
+        past++;
+      }
+    }
+    memo[key]=past;
+  }
+  let cur=0;                                  // today / this week, live
+  if(weekly){
+    const ent=entryFor(g,addDays(weekStart(t),6));let last=null;
+    if(ent)for(let k=0;k<7;k++){const wd=addDays(weekStart(t),k);if(wd>=g.created&&ent.days.includes(parseD(wd).getDay()))last=wd;}
+    if(last){const st=status(g,last);if(st&&st.met)cur=1;}
+  }else{
+    const tg=targetFor(g,t);
+    if(tg&&tg.on){const st=status(g,t);if(g.kind==='avoid'){if(st.failed)return{n:0,unit:'day'};}else if(g.kind==='limit'){if(st.over)return{n:0,unit:'day'};}else if(st.met)cur=1;}
+  }
+  return{n:past+cur,unit:weekly?'week':'day'};
+}
+const streakText=g=>{const s=streakOf(g);return s.n>=2?s.n+' '+s.unit+'s in a row':'';};
+
+/* result of goal g on date d: 'ok' | 'miss' | 'pending' | 'none' */
+function dayResult(g,d){
+  const t=today(),st=status(g,d);if(!st)return 'none';
+  const past=d<t;
+  if(st.avoid)return st.failed?'miss':(!st.tg.on?'none':(past?'ok':'pending'));
+  if(st.limit!==undefined){if(st.over)return 'miss';return st.limit?(past?'ok':'pending'):'none';}
+  if(st.count){
+    if(st.dayHit)return 'ok';
+    return(parseD(d).getDay()===0&&past&&!st.met)?'miss':'none';
+  }
+  if(g.kind==='check'){if(st.done)return 'ok';if(!st.tg.on)return 'none';return past?'miss':'pending';}
+  if(!st.tg.on||!st.tgt)return 'none';
+  if(st.pool){if(st.met)return 'ok';if(d===st.last&&past)return 'miss';return d<=t?'pending':'none';}
+  return st.met?'ok':(past?'miss':'pending');
+}
+function dayLine(g,d){
+  const t=today(),st=status(g,d);if(!st)return '';
+  const r=dayResult(g,d),mk=r==='ok'?' <b class="ok">\u2713</b>':r==='miss'?' <b class="miss">\u2717</b>':'';
+  const row=txt=>`<div class="hl"><span>${esc(g.name)}</span><span>${txt}${mk}</span></div>`;
+  if(st.avoid){if(!st.tg.on&&!st.failed)return '';return row(st.failed?'slipped':(d<t?'clean':'so far so good'));}
+  if(g.kind==='check'){
+    if(st.count)return row((st.done?'done':'\u2013')+' \u00B7 '+st.hits+'/'+st.times+' this week');
+    if(!st.tg.on&&!st.done)return '';
+    return row(st.done?'done':(d<t?'missed':'not yet'));
+  }
+  const m=mins(st.day);
+  if(st.limit!==undefined){if(!st.limit)return m?row(m+'m \u00B7 no limit today'):'';return row(m+' / '+st.limit+'m limit');}
+  if(st.count)return row(m+'m \u00B7 '+st.hits+'/'+st.times+' days this week');
+  if(!st.tg.on)return m?row(m+'m \u00B7 tracked, not counted'):'';
+  if(st.pool)return row(m+'m \u00B7 '+mins(st.cum)+'/'+st.tgt+' total');
+  if(st.tgt)return row(m+' / '+st.tgt+'m');
+  return m?row(m+'m'):'';
+}
+function daySessions(d){
+  const[a,b]=dayBounds(d);
+  return Object.values(S.sessions).filter(s=>!s.deleted&&S.goals[s.goalId]&&!S.goals[s.goalId].deleted&&s.start<b&&s.end>a).sort((x,y)=>x.start-y.start);
+}
+
+/* ---------- check-off goals (no timer) ---------- */
+// S.checks holds one mark per goal per day. check-off goal: mark = done. avoid goal: mark = slipped.
+const isDone=(gid,d)=>{const c=S.checks[gid+'|'+d];return !!(c&&c.done);};
+const isMark=g=>g.kind==='check'||g.kind==='avoid';
+function setCheck(gid,d,val){
+  const k=gid+'|'+d,old=S.checks[k];
+  S.checks[k]={id:k,goalId:gid,date:d,done:val,updatedAt:Math.max(Date.now(),(old?old.updatedAt:0)+1)};
+  save();
+}
+
+/* ---------- timer actions ---------- */
+function stopActive(){
+  const a=S.active;if(!a.goalId)return null;
+  const end=Date.now();let sid=null;
+  if(end-a.start>=MIN_MS){sid='t'+a.start.toString(36)+a.goalId;S.sessions[sid]={id:sid,goalId:a.goalId,start:a.start,end,updatedAt:end};}
+  else flash('under 10s \u2014 discarded');
+  S.active={goalId:null,start:null,updatedAt:Math.max(end,a.updatedAt+1)};
+  save();return sid;
+}
+function startGoal(id){
+  const now=Date.now();if(S.active.goalId)stopActive();
+  S.active={goalId:id,start:now,updatedAt:Math.max(now,S.active.updatedAt+1)};
+  save();
+}
+
+/* ---------- transient message ---------- */
+let ft;
+function flash(t,ok,bad){const m=$('#msg');m.textContent=t;m.classList.toggle('ok',!!ok);m.classList.toggle('bad',!!bad);m.classList.add('show');clearTimeout(ft);ft=setTimeout(()=>m.classList.remove('show'),4500);}
+
+/* ---------- goal-reached check ---------- */
+const prevMet={},prevOver={};
+function check(){
+  const t=today();
+  for(const g of goalsList()){
+    const st=status(g,t);
+    const met=!!(st&&st.met);
+    const k=g.id+t;
+    if(met&&prevMet[k]===false)flash('\u2713 '+g.name+(st.count?' \u2014 week done':st.check?' \u2014 done':' \u2014 '+st.tgt+'m done'),true);
+    prevMet[k]=met;
+    const over=!!(st&&st.over);
+    if(over&&prevOver[k]===false)flash('\u2717 '+g.name+' \u2014 over the limit',false,true);
+    prevOver[k]=over;
+  }
+}
+
+/* ---------- views ---------- */
+function header(){
+  const d=new Date();
+  return `<div class="brand"><b>tick</b>: habit builder and tracker</div><div class="top"><span>${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()]}</span><span class="nav">${['today','history','goals'].map(v=>`<button data-act="view" data-v="${v}" class="${view===v?'on':''}">${v==='history'?'calendar':v}</button>`).join('')}</span></div>`;
+}
+function syncBtn(){return D.refresh?'<button class="link syncline" data-act="sync"></button>':'<span class="dim small syncline"></span>';}
+
+function viewToday(){
+  const gs=goalsList();
+  if(!gs.length)return `<p class="dim">no goals yet.</p><button class="link" data-act="newgoal">+ add a goal</button><div class="foot">${syncBtn()}</div>`;
+  return gs.map(g=>isMark(g)
+    ?`<button class="goal chk" data-act="chktoday" data-g="${g.id}"><div class="g-top"><span class="g-name"><b class="box">[ ]</b> ${esc(g.name)}</span><span class="g-meta"></span></div><div class="g-note"></div></button>`
+    :`<button class="goal" data-act="toggle" data-g="${g.id}"><div class="g-top"><span class="g-name"><b class="box">[ ]</b> ${esc(g.name)}</span><span class="g-meta"></span></div><div class="g-clock"></div><div class="g-total"></div><div class="bar"><i></i></div></button>`).join('')
+    +`<div class="foot"><button class="link" data-act="newgoal">+ goal</button></div><div class="foot" style="margin-top:8px">${syncBtn()}</div>`;
+}
+
+let calMonth=null,dayCtx=null,sheetIsDay=false;
+const addMonth=(s,n)=>{const[y,m]=s.split('-').map(Number),d=new Date(y,m-1+n,1);return d.getFullYear()+'-'+p2(d.getMonth()+1);};
+function viewHistory(){
+  const t=today();if(!calMonth)calMonth=t.slice(0,7);
+  const[y,m]=calMonth.split('-').map(Number),n=new Date(y,m,0).getDate(),lead=(new Date(y,m-1,1).getDay()+6)%7;
+  const gs=goalsList();
+  let cells='';for(let i=0;i<lead;i++)cells+='<span class="cell blank"></span>';
+  for(let day=1;day<=n;day++){
+    const d=y+'-'+p2(m)+'-'+p2(day),fut=d>t;
+    const dots=fut?'':gs.map(g=>{const r=dayResult(g,d);return r==='none'?'':`<i class="dot ${r}"></i>`;}).join('');
+    cells+=`<button class="cell${d===t?' today':''}" data-act="dayopen" data-d="${d}"${fut?' disabled':''}><span>${day}</span><span class="dots">${dots}</span></button>`;
+  }
+  let minM=t.slice(0,7);for(const g of gs)if(g.created.slice(0,7)<minM)minM=g.created.slice(0,7);
+  const atMin=calMonth<=minM,atMax=calMonth>=t.slice(0,7);
+  return `<div class="calhead"><button class="mv" data-act="calprev"${atMin?' disabled':''} aria-label="previous month">\u2039</button><button class="calttl" data-act="calnow">${MON[m-1]} ${y}</button><button class="mv" data-act="calnext"${atMax?' disabled':''} aria-label="next month">\u203A</button></div>
+<div class="cal">${['mon','tue','wed','thu','fri','sat','sun'].map(x=>`<span class="wd">${x}</span>`).join('')}${cells}</div>
+<p class="dim small" style="margin-top:16px"><b class="ok">\u25CF</b> hit &nbsp;<b class="miss">\u25CF</b> missed &nbsp;\u25CB still open. one dot per goal, in your goal order. tap a day for details.</p>`;
+}
+function daySheet(d){
+  dayCtx=d;const t=today();
+  const lines=goalsList().map(g=>dayLine(g,d)).join('')||'<div class="dim small">nothing scheduled.</div>';
+  openSheet(`<h2>${dLabel(d)}${d===t?' (today)':''}</h2><div style="margin-bottom:6px">${lines}</div>${daySessionsHtml(d)}<div class="btns"><button data-act="close">close</button></div>`);
+  sheetIsDay=true;
+}
+const afterEdit=()=>{if(dayCtx)daySheet(dayCtx);else closeSheet();};
+function daySessionsHtml(d){
+  const hasTimer=goalsList().some(g=>!isMark(g));
+  const checks=goalsList().filter(g=>isMark(g)&&d>=g.created).map(g=>{const dn=isDone(g.id,d),av=g.kind==='avoid';
+    return `<button class="ses" data-act="chk" data-g="${g.id}" data-d="${d}"><span>${av?(dn?'[\u2717]':'[ ]'):(dn?'[\u2713]':'[ ]')} ${esc(g.name)}</span><span class="dim small">${av?(dn?'slipped \u2014 tap to undo':'clean \u2014 tap to mark a slip'):(dn?'tap to undo':'tap to mark done')}</span></button>`;}).join('');
+  const list=daySessions(d).map(s=>{
+    const cross=dk(s.end-1)!==dk(s.start);
+    return `<button class="ses" data-act="editses" data-id="${s.id}"><span>${hm(s.start)}\u2013${hm(s.end)}${cross?' +1d':''} ${esc(S.goals[s.goalId].name)}</span><span>${mins(s.end-s.start)}m</span></button>`;
+  }).join('')||(hasTimer?'<div class="dim small">no sessions</div>':'');
+  return `<div class="ses-list">${checks}${list}${hasTimer?`<button class="link" data-act="addses" data-d="${d}" style="margin-top:6px">+ add session</button>`:''}</div>`;
+}
+
+function viewGoals(){
+  const gl=goalsList();
+  const rows=gl.map((g,i)=>{
+    const e=entryFor(g,today())||g.history[g.history.length-1];
+    const sum=g.kind==='avoid'?'avoid '+daysLabel(e.days)
+      :g.kind==='limit'?'limit '+e.minutes+'m '+daysLabel(e.days)
+      :g.kind==='check'?(e.times?'check off '+e.times+'x a week':'check off '+daysLabel(e.days))
+      :e.times?(e.minutes?e.minutes+'m on ':'')+e.times+' days a week'
+      :e.minutes?e.minutes+'m '+(e.pool?'total across ':'each ')+daysLabel(e.days):'tracked only';
+    return `<div class="grow"><button class="gedit" data-act="editgoal" data-g="${g.id}"><span>${esc(g.name)}</span><span class="dim small">${sum}</span></button><button class="mv" data-act="up" data-g="${g.id}"${i===0?' disabled':''} aria-label="move up">\u2191</button><button class="mv" data-act="down" data-g="${g.id}"${i===gl.length-1?' disabled':''} aria-label="move down">\u2193</button></div>`;
+  }).join('');
+  const sync=D.refresh
+    ?`<div>dropbox connected <span class="dim">${esc(D.path)}</span></div><div class="btns" style="margin-top:12px"><button data-act="sync">sync now</button><button class="danger" data-act="disc">disconnect</button></div><div class="dim small syncline" style="margin-top:12px"></div>`
+    :`<div class="dim">not synced \u2014 data lives on this device only.</div><div class="btns" style="margin-top:12px"><button data-act="connect">connect dropbox</button></div>`;
+  return `<div class="sec">${rows||'<p class="dim">no goals yet.</p>'}${rows?'<p class="dim small" style="margin:8px 0 0">tap a goal to edit or delete it. arrows reorder.</p>':''}<button class="link" data-act="newgoal" style="margin-top:14px">+ add goal</button></div>
+<div class="sec"><label for="keep" style="margin:0">keep history (days)</label><input id="keep" type="number" inputmode="numeric" min="7" max="3650" value="${S.meta.keepDays}"><p class="dim small" style="margin:8px 0 0">older days are deleted for good. back up first if you want to keep them.</p></div>
+<div class="sec"><div>backup</div><p class="dim small" style="margin:6px 0 0">a backup file holds all your goals, sessions and marks (no dropbox login). restore reads one back.</p><div class="btns" style="margin-top:12px"><button data-act="exportjson">export backup</button><button data-act="restore">restore backup</button><button data-act="exportcsv">export csv</button>${undoBtn()}</div></div>
+<div class="sec">${sync}</div>`;
+}
+
+function render(){
+  $('#app').innerHTML=header()+(view==='today'?viewToday():view==='history'?viewHistory():viewGoals());
+  paint();
+}
+function softRender(){const ae=document.activeElement;if(ae&&ae.id==='keep')return paint();render();}
+
+/* ---------- per-second paint (touches text only, never rebuilds rows) ---------- */
+function paint(){
+  check();
+  const t=today(),a=S.active,now=Date.now();
+  if(view==='today')document.querySelectorAll('.goal').forEach(b=>{
+    const g=S.goals[b.dataset.g];if(!g)return;
+    if(isMark(g)){
+      const cs=status(g,t),done=isDone(g.id,t),off=!!(cs&&cs.tg&&!cs.tg.on&&!done);
+      if(g.kind==='avoid'){
+        b.classList.toggle('fail',done);b.classList.remove('met');
+        b.querySelector('.box').textContent=done?'[\u2717]':'[ ]';
+        b.querySelector('.g-note').textContent=done?'slipped \u2014 tomorrow is a fresh start. tap to undo.':(off?'':'so far so good! tap here if you slip.');
+      }else{
+        b.classList.toggle('met',cs&&cs.count?cs.met:done);
+        b.querySelector('.box').textContent=done?'[\u2713]':'[ ]';
+        b.querySelector('.g-note').textContent=cs&&cs.count?cs.hits+' / '+cs.times+' this week':'';
+      }
+      b.querySelector('.g-meta').textContent=off?'off today':streakText(g);
+      return;
+    }
+    const dm=dayMs(g.id,t),run=a.goalId===g.id;
+    const st=status(g,t)||{tg:null,tgt:0,day:dm,cum:dm,pool:false,met:false};
+    const tgt=st.tgt,met=st.met;
+    const off=!!(st.tg&&st.tg.minutes>0&&!st.tg.on);
+    b.classList.toggle('run',run);b.classList.toggle('met',met);b.classList.toggle('fail',!!st.over);
+    b.querySelector('.box').textContent=run?'[\u25B6]':st.over?'[\u2717]':met?'[\u2713]':'[ ]';
+    b.querySelector('.g-meta').textContent=off?'off today':streakText(g);
+    b.querySelector('.g-clock').textContent=run?clock(now-a.start):'';
+    const wk=st.count?' \u00B7 '+st.hits+'/'+st.times+' this week':(st.pool?' \u00B7 '+daysLabel(st.tg.days):(st.limit?' \u00B7 limit':''));
+    let tot;
+    if(tgt)tot=clock(st.cum)+' / '+clock(tgt*60000)+wk;
+    else if(st.count)tot=clock(st.day)+wk;
+    else if(off&&!st.day)tot='';
+    else tot=clock(st.day)+(off?(st.limit!==undefined?' \u00B7 no limit today':' \u00B7 tracked, not counted today'):'');
+    b.querySelector('.g-total').textContent=tot;
+    const bar=b.querySelector('.bar');bar.style.display=tgt?'block':'none';
+    if(tgt)bar.firstChild.style.width=Math.min(100,st.cum/(tgt*60000)*100)+'%';
+  });
+  const ag=a.goalId&&S.goals[a.goalId];
+  document.title=ag?'\u25B6 '+clock(now-a.start)+' '+ag.name:'tick';
+  paintSync();
+}
+function tick(){
+  if(today()!==curDay){curDay=today();render();return;}
+  paint();
+}
+
+/* ---------- sheets ---------- */
+const sheet=$('#sheet');
+const openSheet=h=>{sheetIsDay=false;sheet.innerHTML='<div class="in">'+h+'</div>';sheet.hidden=false;sheet.scrollTop=0;};
+const closeSheet=()=>{sheet.hidden=true;sheet.innerHTML='';delete sheet.dataset.kind;delete sheet.dataset.mode;};
+const sheetErr=t=>{const e=sheet.querySelector('.err');if(e)e.textContent=t;};
+
+const KIND_HELP={timer:'start and stop it. tracks minutes toward a daily target.',check:'tap when it is done. no timer.',avoid:'counts as a win every day unless you tap to mark a slip.',limit:'a timer with a cap. stay under it and the day is a win. go over and it counts as a fail.'};
+const MODE_HELP={each:'you need the full target on every selected day.',pool:'minutes add up across the selected days each week (mon\u2013sun). miss one day and make it up on another \u2014 no fail.',count:'no fixed days. reach it on this many days each week (mon\u2013sun), whichever days you like. a day counts when the daily target is met.',set:'on the days you select.'};
+function goalSheet(id){
+  const g=id&&S.goals[id],kind=g?(g.kind||'timer'):'timer';
+  const e=g?(entryFor(g,today())||g.history[g.history.length-1]):{minutes:30,days:[0,1,2,3,4,5,6],times:0};
+  const mode=e.times>0?'count':(e.pool?'pool':'each');
+  openSheet(`<h2>${g?'edit goal':'new goal'}</h2>
+<label for="g-name">name</label><input id="g-name" maxlength="24" autocomplete="off" autocapitalize="off" value="${g?esc(g.name):''}">
+${g?'':`<label>type</label><div class="modes"><button class="kopt on" data-act="kindtog" data-k="timer">timer</button><button class="kopt" data-act="kindtog" data-k="check">check off</button><button class="kopt" data-act="kindtog" data-k="avoid">avoid</button><button class="kopt" data-act="kindtog" data-k="limit">limit</button></div><p class="dim small" id="kind-help" style="margin-top:8px">${KIND_HELP.timer}</p>`}
+<div class="only-timer"><label for="g-min" id="min-label">${kind==='limit'?'daily limit, minutes':'daily target, minutes (0 = just track)'}</label><input id="g-min" type="number" inputmode="numeric" min="0" value="${e.minutes}"></div>
+<div class="only-days"><label>days</label><div class="days">${[1,2,3,4,5,6,0].map(d=>`<button class="day${e.days.includes(d)?' on':''}" data-act="daytog" data-d="${d}">${DOW[d]}</button>`).join('')}</div></div>
+<div class="no-avoid"><label>how it counts</label>
+<div class="modes mg-timer"><button class="opt${mode==='each'?' on':''}" data-act="modetog" data-m="each">each day</button><button class="opt${mode==='pool'?' on':''}" data-act="modetog" data-m="pool">week total</button><button class="opt${mode==='count'?' on':''}" data-act="modetog" data-m="count">x days a week</button></div>
+<div class="modes mg-check"><button class="opt${mode==='count'?'':' on'}" data-act="modetog" data-m="each">set days</button><button class="opt${mode==='count'?' on':''}" data-act="modetog" data-m="count">x times a week</button></div>
+<p class="dim small" id="mode-help" style="margin-top:8px">${kind==='check'&&mode!=='count'?MODE_HELP.set:MODE_HELP[mode]}</p>
+<div class="only-count"><label for="g-times">times per week</label><input id="g-times" type="number" inputmode="numeric" min="1" max="7" value="${e.times||3}"></div></div>
+${g?'<p class="dim small" style="margin-top:14px">changes apply from today. past days keep the old settings.</p>':''}
+<div class="err"></div>
+<div class="btns"><button class="go" data-act="savegoal" data-g="${g?g.id:''}">save</button><button data-act="close">cancel</button>${g?`<button class="danger" data-act="delgoal" data-g="${g.id}">delete</button>`:''}</div>`);
+  sheet.dataset.kind=kind;sheet.dataset.mode=mode;
+}
+
+function sessionSheet(id,dateHint,note){
+  const gs=goalsList().filter(g=>!isMark(g));if(!gs.length)return;
+  const s=id&&S.sessions[id];let st,en,gid;
+  if(s){st=s.start;en=s.end;gid=s.goalId;}
+  else{
+    gid=gs[0].id;
+    if(!dateHint||dateHint===today()){en=Math.floor(Date.now()/60000)*60000;st=en-30*60000;}
+    else{st=dayBounds(dateHint)[0]+9*3600000;en=st+30*60000;}
+  }
+  openSheet(`<h2>${s?'edit session':'add session'}</h2>
+${note?`<p class="dim small">${esc(note)}</p>`:''}
+<label for="s-goal">goal</label><select id="s-goal">${gs.map(g=>`<option value="${g.id}"${g.id===gid?' selected':''}>${esc(g.name)}</option>`).join('')}</select>
+<label for="s-start">start</label><input id="s-start" type="datetime-local" value="${dtv(st)}">
+<label for="s-end">end</label><input id="s-end" type="datetime-local" value="${dtv(en)}">
+<div class="err"></div>
+<div class="btns"><button class="go" data-act="saveses" data-id="${s?s.id:''}">save</button><button data-act="close">cancel</button>${s?`<button class="danger" data-act="delses" data-id="${s.id}">delete</button>`:''}</div>`);
+}
+
+function confirmSheet(msg,yesAct,attrs,yesLabel){
+  openSheet(`<h2>are you sure?</h2><p>${msg}</p><div class="btns"><button class="danger" data-act="${yesAct}" ${attrs}>${yesLabel}</button><button data-act="close">keep it</button></div>`);
+}
+function moveGoal(id,dir){
+  const gs=goalsList(),i=gs.findIndex(g=>g.id===id),j=i+dir;if(i<0||j<0||j>=gs.length)return;
+  const a=gs[i],b=gs[j],now=Date.now(),o=a.order;
+  a.order=b.order;b.order=o;
+  a.updatedAt=Math.max(now,a.updatedAt+1);b.updatedAt=Math.max(now,b.updatedAt+1);
+  save();render();
+}
+function connectSheet(){
+  openSheet(`<h2>connect dropbox</h2>
+<p class="dim small">1. in your dropbox app console, add this redirect uri and enable files.content.read + files.content.write:</p>
+<p class="code">${esc(REDIRECT)}</p>
+<p class="dim small">2. on iphone, connect from inside the home-screen app. it keeps its data separate from safari.</p>
+<label for="f-key">app key</label><input id="f-key" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(D.appKey||'')}">
+<label for="f-path">file path in dropbox</label><input id="f-path" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(D.path||'/tick.json')}">
+<div class="err"></div>
+<div class="btns"><button class="go" data-act="docon">connect</button><button data-act="close">cancel</button></div>`);
+}
+
+/* ---------- click handling ---------- */
+const H={
+  view(a){view=a.dataset.v;render();},
+  toggle(a){
+    const id=a.dataset.g;
+    if(S.active.goalId===id){
+      const sid=stopActive();render();
+      if(sid&&S.sessions[sid].end-S.sessions[sid].start>LONG_H*3600000)sessionSheet(sid,null,'long session \u2014 check the end time.');
+    }else{startGoal(id);render();}
+  },
+  newgoal(){goalSheet(null);},
+  editgoal(a){goalSheet(a.dataset.g);},
+  daytog(a){a.classList.toggle('on');},
+  kindtog(a){
+    sheet.querySelectorAll('.kopt').forEach(b=>b.classList.toggle('on',b===a));
+    sheet.dataset.kind=a.dataset.k;sheet.dataset.mode='each';
+    sheet.querySelectorAll('.mg-timer,.mg-check').forEach(gp=>gp.querySelectorAll('.opt').forEach((b,i)=>b.classList.toggle('on',i===0)));
+    $('#kind-help').textContent=KIND_HELP[a.dataset.k];
+    $('#min-label').textContent=a.dataset.k==='limit'?'daily limit, minutes':'daily target, minutes (0 = just track)';
+    if(a.dataset.k==='limit'&&(+$('#g-min').value===0||+$('#g-min').value===30))$('#g-min').value=30;
+    $('#mode-help').textContent=a.dataset.k==='check'?MODE_HELP.set:MODE_HELP.each;
+  },
+  chktoday(a){const id=a.dataset.g,t=today();setCheck(id,t,!isDone(id,t));render();},
+  chk(a){setCheck(a.dataset.g,a.dataset.d,!isDone(a.dataset.g,a.dataset.d));render();if(dayCtx&&sheetIsDay)daySheet(dayCtx);},
+  dayopen(a){daySheet(a.dataset.d);},
+  calprev(){calMonth=addMonth(calMonth,-1);render();},
+  calnext(){calMonth=addMonth(calMonth,1);render();},
+  calnow(){calMonth=today().slice(0,7);render();},
+  exportcsv(){exportCsv();},
+  exportjson(){exportJson();},
+  restore(){$('#restorefile').click();},
+  restoremerge(){if(!pending)return;const c=pending;pending=null;closeSheet();applyRestore(c,'merge');flash('backup merged');},
+  restorereplace(){confirmSheet('replace everything here with the backup? goals, sessions and marks that are not in it will be removed, on synced devices too. let your other devices sync first. you can undo this right after.','restorereplaceyes','','yes, replace');},
+  restorereplaceyes(){
+    if(!pending)return;const c=pending;
+    try{localStorage.setItem(UKEY,JSON.stringify({at:Date.now(),state:S}));}
+    catch(e){closeSheet();flash('not enough space for an undo copy \u2014 export a backup first');return;}
+    pending=null;closeSheet();applyRestore(c,'replace');flash('restored from backup');
+  },
+  restoreundo(){confirmSheet('undo the last restore? this puts back the data you had just before it.','restoreundoyes','','yes, undo');},
+  restoreundoyes(){
+    let u=null;try{u=JSON.parse(localStorage.getItem(UKEY));}catch(e){}
+    closeSheet();if(!u||!u.state)return;
+    localStorage.removeItem(UKEY);applyRestore(cleanBackup(u.state),'replace');flash('restore undone');
+  },
+  modetog(a){
+    a.parentNode.querySelectorAll('.opt').forEach(b=>b.classList.toggle('on',b===a));
+    sheet.dataset.mode=a.dataset.m;
+    const chk=sheet.dataset.kind==='check';
+    $('#mode-help').textContent=chk&&a.dataset.m!=='count'?MODE_HELP.set:MODE_HELP[a.dataset.m];
+  },
+  up(a){moveGoal(a.dataset.g,-1);},
+  down(a){moveGoal(a.dataset.g,1);},
+  savegoal(a){
+    const name=$('#g-name').value.trim();if(!name)return sheetErr('give it a name');
+    const now=Date.now(),t=today();let g=a.dataset.g&&S.goals[a.dataset.g];
+    const kob=sheet.querySelector('.kopt.on');
+    const kind=g?(g.kind||'timer'):(kob?kob.dataset.k:'timer');
+    let minutes=Math.max(0,parseInt($('#g-min').value,10)||0),pool=false,times=0,days=[0,1,2,3,4,5,6];
+    const picked=()=>[...sheet.querySelectorAll('.day.on')].map(b=>+b.dataset.d);
+    if(kind==='avoid'||kind==='limit'){
+      days=picked();if(!days.length)return sheetErr('pick at least one day');
+      if(kind==='limit'&&!minutes)return sheetErr('set a limit in minutes');
+    }
+    else{
+      const mo=sheet.querySelector('.mg-'+(kind==='check'?'check':'timer')+' .opt.on'),mode=mo?mo.dataset.m:'each';
+      if(mode==='count')times=Math.min(7,Math.max(1,parseInt($('#g-times').value,10)||3));
+      else{days=picked();if(!days.length)return sheetErr('pick at least one day');pool=mode==='pool'&&kind==='timer';}
+    }
+    if(kind==='check'||kind==='avoid')minutes=0;
+    if(!g){const id='g'+rid();S.goals[id]={id,name,kind,created:t,order:now,history:[{from:t,minutes,days,pool,times}],updatedAt:now};}
+    else{
+      const cur=entryFor(g,t)||{days:[]};
+      const same=cur.minutes===minutes&&!!cur.pool===pool&&(cur.times||0)===times&&[...cur.days].sort().join()===[...days].sort().join();
+      g.name=name;
+      if(!same)g.history=g.history.filter(h=>h.from<t).concat({from:t,minutes,days,pool,times});
+      g.updatedAt=Math.max(now,g.updatedAt+1);
+    }
+    closeSheet();save();render();
+  },
+  delgoal(a){
+    const g=S.goals[a.dataset.g];if(!g)return;
+    confirmSheet(`delete <b>${esc(g.name)}</b>? it disappears from today and history. this can't be undone.`,'delgoalyes',`data-g="${g.id}"`,'yes, delete');
+  },
+  delgoalyes(a){
+    const g=S.goals[a.dataset.g];if(!g)return;
+    if(S.active.goalId===g.id)stopActive();
+    g.deleted=true;g.updatedAt=Math.max(Date.now(),g.updatedAt+1);
+    closeSheet();save();render();
+  },
+  addses(a){sessionSheet(null,a.dataset.d);},
+  editses(a){sessionSheet(a.dataset.id);},
+  saveses(a){
+    const gid=$('#s-goal').value,st=new Date($('#s-start').value).getTime(),en=new Date($('#s-end').value).getTime();
+    if(!(st>0&&en>st))return sheetErr('end must be after start');
+    const now=Date.now();let s=a.dataset.id&&S.sessions[a.dataset.id];
+    if(s)Object.assign(s,{goalId:gid,start:st,end:en,updatedAt:Math.max(now,s.updatedAt+1)});
+    else{const id='m'+rid();S.sessions[id]={id,goalId:gid,start:st,end:en,updatedAt:now};}
+    save();render();afterEdit();
+  },
+  delses(a){
+    const s=S.sessions[a.dataset.id];if(!s)return;
+    confirmSheet(`delete this ${mins(s.end-s.start)}m session (${hm(s.start)}\u2013${hm(s.end)})? this can't be undone.`,'delsesyes',`data-id="${s.id}"`,'yes, delete');
+  },
+  delsesyes(a){
+    const s=S.sessions[a.dataset.id];if(!s)return;
+    S.sessions[s.id]={...s,deleted:true,updatedAt:Math.max(Date.now(),s.updatedAt+1)};
+    save();render();afterEdit();
+  },
+  close(){if(dayCtx&&!sheetIsDay){daySheet(dayCtx);return;}closeSheet();dayCtx=null;},
+  connect(){connectSheet();},
+  docon:async()=>{
+    const key=$('#f-key').value.trim();let path=$('#f-path').value.trim()||'/tick.json';
+    if(!key)return sheetErr('paste your dropbox app key');
+    if(path[0]!=='/')path='/'+path;
+    const v=b64u(crypto.getRandomValues(new Uint8Array(48)));
+    const ch=b64u(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v))));
+    D.appKey=key;D.path=path;D.verifier=v;dsave();
+    location.href='https://www.dropbox.com/oauth2/authorize?'+new URLSearchParams({client_id:key,response_type:'code',code_challenge:ch,code_challenge_method:'S256',token_access_type:'offline',redirect_uri:REDIRECT});
+  },
+  sync(){sync(true);},
+  disc(){confirmSheet('disconnect dropbox? your data stays on this device and the file stays in dropbox, but this device stops syncing.','discyes','','yes, disconnect');},
+  discyes(){closeSheet();localStorage.removeItem(DKEY);D={};setSS('');render();}
+};
+const b64u=u8=>btoa(String.fromCharCode(...u8)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+
+document.addEventListener('click',e=>{
+  const a=e.target.closest('[data-act]');if(!a)return;
+  const f=H[a.dataset.act];if(f)f(a);
+});
+document.addEventListener('change',e=>{
+  if(e.target.id==='keep'){
+    const n=Math.min(365,Math.max(7,parseInt(e.target.value,10)||60));e.target.value=n;
+    S.meta={keepDays:n,updatedAt:Math.max(Date.now(),S.meta.updatedAt+1)};prune();save();
+  }
+});
+$('#restorefile').addEventListener('change',e=>{
+  const f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;
+  const r=new FileReader();r.onload=()=>restoreSheet(String(r.result),f.name);r.readAsText(f);
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!sheet.hidden)H.close();});
+
+/* ---------- export ---------- */
+async function saveFile(name,text,type){
+  const blob=new Blob([text],{type});
+  try{
+    const f=new File([blob],name,{type});
+    if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:name});return;}
+  }catch(e){if(e&&e.name==='AbortError')return;}
+  const u=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);
+}
+const csvq=s=>'"'+String(s).replace(/"/g,'""')+'"';
+function exportCsv(){
+  const t=today(),lim=addDays(t,-(S.meta.keepDays-1)),rows=['date,goal,type,minutes,marked,result'];
+  const gs=Object.values(S.goals).filter(g=>!g.deleted).sort((a,b)=>a.order-b.order);
+  let first=t;for(const g of gs)if(g.created<first)first=g.created;
+  if(first<lim)first=lim;
+  for(let d=first;d<=t;d=addDays(d,1))for(const g of gs){
+    if(d<g.created)continue;
+    rows.push([d,csvq(g.name),g.kind||'timer',isMark(g)?'':mins(dayMs(g.id,d)),isMark(g)?(isDone(g.id,d)?1:0):'',dayResult(g,d)].join(','));
+  }
+  saveFile('tick-'+t+'.csv',rows.join('\n'),'text/csv');
+}
+function exportJson(){saveFile('tick-backup-'+today()+'.json',JSON.stringify({app:'tick',v:1,exportedAt:new Date().toISOString(),...S},null,1),'application/json');}
+
+/* ---------- restore ---------- */
+const UKEY='tick_undo';       // snapshot taken just before a "replace" restore
+let pending=null;
+const ISO=/^\d{4}-\d\d-\d\d$/;
+const undoBtn=()=>localStorage.getItem(UKEY)?'<button class="danger" data-act="restoreundo">undo last restore</button>':'';
+
+function cleanBackup(o){       // keep only well-formed entries
+  const out={goals:{},sessions:{},checks:{},skipped:0};
+  for(const g of Object.values(o.goals||{})){
+    if(g&&typeof g.id==='string'&&typeof g.name==='string'&&ISO.test(g.created||'')&&Array.isArray(g.history)&&g.history.length
+       &&g.history.every(x=>x&&ISO.test(x.from||'')&&Array.isArray(x.days)&&Number.isFinite(x.minutes)))
+      out.goals[g.id]={...g,order:+g.order||0,updatedAt:+g.updatedAt||0};
+    else out.skipped++;
+  }
+  for(const s of Object.values(o.sessions||{})){
+    if(s&&typeof s.id==='string'&&typeof s.goalId==='string'&&Number.isFinite(s.start)&&Number.isFinite(s.end)&&s.end>s.start)
+      out.sessions[s.id]={...s,updatedAt:+s.updatedAt||0};
+    else out.skipped++;
+  }
+  for(const c of Object.values(o.checks||{})){
+    if(c&&typeof c.goalId==='string'&&ISO.test(c.date||'')){const id=c.goalId+'|'+c.date;out.checks[id]={id,goalId:c.goalId,date:c.date,done:!!c.done,updatedAt:+c.updatedAt||0};}
+    else out.skipped++;
+  }
+  return out;
+}
+function backupSpan(c){        // earliest / latest day that has real data
+  let lo=null,hi=null;const see=d=>{if(!lo||d<lo)lo=d;if(!hi||d>hi)hi=d;};
+  for(const s of Object.values(c.sessions))if(!s.deleted)see(dk(s.start));
+  for(const x of Object.values(c.checks))if(x.done)see(x.date);
+  return{lo,hi};
+}
+const daysBack=d=>Math.ceil((Date.now()-parseD(d).getTime())/864e5)+1;
+
+function applyRestore(c,mode){
+  const now=Date.now(),stamp=old=>Math.max(now,(old&&old.updatedAt||0)+1);
+  if(mode==='merge'){
+    S=merge(S,{goals:c.goals,sessions:c.sessions,checks:c.checks,active:S.active,meta:S.meta});
+  }else{
+    // "replace" = make everything here match the backup. anything not in it gets a delete marker,
+    // and everything in it gets a fresh timestamp, so synced devices follow along.
+    const ng={},ns={},nc={};
+    for(const[k,g]of Object.entries(c.goals))ng[k]={...g,updatedAt:stamp(S.goals[k])};
+    for(const[k,g]of Object.entries(S.goals))if(!ng[k])ng[k]=g.deleted?g:{...g,deleted:true,updatedAt:stamp(g)};
+    for(const[k,s]of Object.entries(c.sessions))ns[k]={...s,updatedAt:stamp(S.sessions[k])};
+    for(const[k,s]of Object.entries(S.sessions))if(!ns[k])ns[k]=s.deleted?s:{...s,deleted:true,updatedAt:stamp(s)};
+    for(const[k,x]of Object.entries(c.checks))nc[k]={...x,updatedAt:stamp(S.checks[k])};
+    for(const[k,x]of Object.entries(S.checks))if(!nc[k])nc[k]=x.done?{...x,done:false,updatedAt:stamp(x)}:x;
+    S={goals:ng,sessions:ns,checks:nc,active:{goalId:null,start:null,updatedAt:stamp(S.active)},meta:S.meta};
+  }
+  const{lo}=backupSpan(c);                      // don't let the keep-history setting throw restored days away
+  if(lo&&daysBack(lo)>S.meta.keepDays)S.meta={keepDays:Math.min(3650,daysBack(lo)),updatedAt:Math.max(now,S.meta.updatedAt+1)};
+  prune();save();render();
+}
+function restoreSheet(text,fname){
+  let o=null;try{o=JSON.parse(text);}catch(e){}
+  const bad=m=>openSheet(`<h2>restore backup</h2><p>${m}</p><div class="btns"><button data-act="close">close</button></div>`);
+  if(!o||typeof o!=='object'||!o.goals||typeof o.goals!=='object'||!o.sessions||typeof o.sessions!=='object')return bad("that file isn't a tick backup.");
+  const c=cleanBackup(o);
+  const gN=Object.values(c.goals).filter(g=>!g.deleted).length,sN=Object.values(c.sessions).filter(s=>!s.deleted).length,mN=Object.values(c.checks).filter(x=>x.done).length;
+  if(!gN&&!sN&&!mN)return bad('there is nothing usable in that file.');
+  const{lo,hi}=backupSpan(c);
+  pending=c;
+  const raise=lo&&daysBack(lo)>S.meta.keepDays;
+  const when=o.exportedAt&&!isNaN(Date.parse(o.exportedAt))?' \u00B7 exported '+dLabel(dk(Date.parse(o.exportedAt))):'';
+  openSheet(`<h2>restore backup</h2>
+<p class="dim small">${esc(fname)}${when}</p>
+<p>${gN} goal${gN===1?'':'s'} \u00B7 ${sN} session${sN===1?'':'s'} \u00B7 ${mN} mark${mN===1?'':'s'}${lo?'<br>'+dLabel(lo)+' \u2192 '+dLabel(hi):''}${c.skipped?`<br><span class="dim small">${c.skipped} unreadable item${c.skipped===1?'':'s'} skipped</span>`:''}</p>
+${raise?`<p class="dim small">keep history will be raised to ${Math.min(3650,daysBack(lo))} days so nothing in the backup is dropped.</p>`:''}
+<p><button class="go" data-act="restoremerge">merge into current data</button><br><span class="dim small">adds anything that's missing. keeps your newer edits and deletions. safest.</span></p>
+<p><button class="danger" data-act="restorereplace">replace current data</button><br><span class="dim small">makes this device, and synced devices, match the backup exactly. you can undo it right after.</span></p>
+<div class="btns"><button data-act="close">cancel</button></div>`);
+}
+
+/* ---------- dropbox sync ---------- */
+let SS={txt:'',err:''};
+function setSS(txt,err){SS={txt,err:err||''};paintSync();}
+function paintSync(){
+  const t=!D.refresh?'local only':SS.err?'sync error: '+SS.err.slice(0,140):(SS.txt||'');
+  document.querySelectorAll('.syncline').forEach(el=>{el.textContent=t;el.style.color=SS.err&&D.refresh?'var(--red)':'';});
+}
+const arg=o=>JSON.stringify(o).replace(/[\u007f-\uffff]/g,c=>'\\u'+('0000'+c.charCodeAt(0).toString(16)).slice(-4));
+async function accessToken(){
+  if(D.access&&Date.now()<D.exp-60000)return D.access;
+  const r=await fetch('https://api.dropboxapi.com/oauth2/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'refresh_token',refresh_token:D.refresh,client_id:D.appKey})});
+  const j=await r.json();
+  if(!r.ok)throw new Error('auth failed \u2014 reconnect in goals ('+JSON.stringify(j).slice(0,120)+')');
+  D.access=j.access_token;D.exp=Date.now()+j.expires_in*1000;dsave();return D.access;
+}
+async function api(url,opts,retry=true){
+  const t=await accessToken();
+  const r=await fetch(url,{...opts,headers:{...opts.headers,Authorization:'Bearer '+t}});
+  if(r.status===401&&retry){D.access=null;return api(url,opts,false);}
+  return r;
+}
+async function dbxDown(){
+  const r=await api('https://content.dropboxapi.com/2/files/download',{method:'POST',headers:{'Dropbox-API-Arg':arg({path:D.path})}});
+  if(r.ok){
+    let rev=null;try{rev=JSON.parse(r.headers.get('dropbox-api-result')||'{}').rev||null;}catch(e){}
+    return{data:JSON.parse(await r.text()),rev};   // a corrupt file throws here and is never overwritten
+  }
+  const t=await r.text();
+  if(r.status===409&&t.includes('not_found'))return{data:null,rev:null};
+  throw new Error('download '+r.status+' '+t.slice(0,160));
+}
+async function dbxUp(data,mode){
+  const r=await api('https://content.dropboxapi.com/2/files/upload',{method:'POST',headers:{'Content-Type':'application/octet-stream','Dropbox-API-Arg':arg({path:D.path,mode,autorename:false,mute:true})},body:JSON.stringify(data)});
+  if(r.ok)return true;
+  const t=await r.text();
+  if(r.status===409&&t.includes('conflict'))return false;   // someone wrote first: download, merge, retry
+  throw new Error('upload '+r.status+' '+t.slice(0,160));
+}
+const newer=(x,y)=>!x?y:!y?x:(y.updatedAt>x.updatedAt?y:x);
+const mergeMap=(a,b)=>{const o={};for(const k of new Set([...Object.keys(a),...Object.keys(b)]))o[k]=newer(a[k],b[k]);return o;};
+const merge=(a,b)=>({goals:mergeMap(a.goals,b.goals),sessions:mergeMap(a.sessions,b.sessions),checks:mergeMap(a.checks,b.checks),active:newer(a.active,b.active),meta:newer(a.meta,b.meta)});
+
+let syncing=false,again=false;
+async function sync(manual){
+  if(!D.refresh)return;
+  if(syncing){again=true;return;}
+  syncing=true;again=false;if(manual)setSS('syncing\u2026');
+  try{
+    for(let i=0;i<3;i++){
+      const r=await dbxDown();
+      const before=canon(S);
+      if(r.data){S=merge(S,norm(r.data));idxDirty=true;ver++;}
+      prune();
+      localStorage.setItem(KEY,JSON.stringify(S));
+      if(canon(S)!==before)softRender();
+      if(r.data&&canon(norm(r.data))===canon(S))break;
+      const mode=!r.data?{'.tag':'add'}:r.rev?{'.tag':'update',update:r.rev}:{'.tag':'overwrite'};
+      if(await dbxUp(S,mode))break;
+    }
+    setSS('synced '+hm(Date.now()));
+  }catch(e){setSS(navigator.onLine?'sync error':'offline',navigator.onLine?String(e.message||e):'');}
+  syncing=false;
+  if(again)setTimeout(sync,300);
+}
+
+async function oauthReturn(){
+  const p=new URLSearchParams(location.search);
+  if(!p.get('code')&&!p.get('error'))return;
+  const code=p.get('code'),err=p.get('error_description')||p.get('error');
+  history.replaceState(null,'',location.pathname);
+  if(!code){setSS('connect failed',err);return;}
+  if(!D.verifier)return;
+  try{
+    const r=await fetch('https://api.dropboxapi.com/oauth2/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({code,grant_type:'authorization_code',code_verifier:D.verifier,client_id:D.appKey,redirect_uri:REDIRECT})});
+    const j=await r.json();
+    if(!r.ok||!j.refresh_token)throw new Error(JSON.stringify(j).slice(0,160));
+    D.access=j.access_token;D.exp=Date.now()+j.expires_in*1000;D.refresh=j.refresh_token;delete D.verifier;dsave();
+    view='goals';
+  }catch(e){setSS('connect failed',String(e.message||e));}
+}
+
+/* ---------- boot ---------- */
+(async()=>{
+  await oauthReturn();
+  prune();render();
+  setInterval(tick,1000);
+  setInterval(()=>{if(!document.hidden)sync();},20000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){curDay=today();softRender();sync();}});
+  window.addEventListener('online',()=>sync());
+  sync();
+  if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+})();
+})();
+</script>
+</body>
+</html>
