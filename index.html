@@ -40,7 +40,7 @@ p{margin:0 0 12px}
 .goal.run{border-color:#5a5a5a}
 .goal.met{color:var(--green);border-color:#2e4630}
 .g-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
-.g-name{font-size:18px}
+.g-name{font-size:18px;min-width:0;overflow-wrap:anywhere}
 .g-meta{color:var(--dim);font-size:13px;text-align:right}
 .goal.met .g-meta{color:var(--green)}
 .box{font-weight:400;color:var(--dim)}
@@ -58,7 +58,8 @@ p{margin:0 0 12px}
 /* history + goals lists */
 .dr{border-bottom:1px solid var(--faint);padding:12px 0}
 .dh{display:flex;justify-content:space-between;width:100%;color:var(--dim);font-size:12px;margin-bottom:4px}
-.hl{display:flex;justify-content:space-between}
+.hl{display:flex;justify-content:space-between;gap:12px}
+.hl>span:first-child,.gedit>span,.ses>span:first-child{min-width:0;overflow-wrap:anywhere}
 .ok{color:var(--green)}
 .miss{color:var(--red)}
 .ses-list{margin-top:10px;padding-top:10px;border-top:1px dashed var(--faint)}
@@ -515,7 +516,7 @@ function goalSheet(id){
   const mode=e.times>0?'count':(e.pool?'pool':'each');
   const t0=today(),canMove=!g||g.created>=t0,startVal=g?g.created:t0;
   openSheet(`<h2>${g?'edit goal':'new goal'}</h2>
-<label for="g-name">name</label><input id="g-name" maxlength="24" autocomplete="off" autocapitalize="off" value="${g?esc(g.name):''}">
+<label for="g-name">name</label><input id="g-name" maxlength="60" autocomplete="off" autocapitalize="off" value="${g?esc(g.name):''}">
 ${g?'':`<label>type</label><div class="modes"><button class="kopt on" data-act="kindtog" data-k="timer">timer</button><button class="kopt" data-act="kindtog" data-k="check">check off</button><button class="kopt" data-act="kindtog" data-k="avoid">avoid</button><button class="kopt" data-act="kindtog" data-k="limit">limit</button></div><p class="dim small" id="kind-help" style="margin-top:8px">${KIND_HELP.timer}</p>`}
 <div class="only-timer"><label for="g-min" id="min-label">${kind==='limit'?'daily limit, minutes':'daily target, minutes (0 = just track)'}</label><input id="g-min" type="number" inputmode="numeric" min="0" value="${e.minutes}"></div>
 <div class="only-days"><label>days</label><div class="days">${[1,2,3,4,5,6,0].map(d=>`<button class="day${e.days.includes(d)?' on':''}" data-act="daytog" data-d="${d}">${DOW[d]}</button>`).join('')}</div></div>
