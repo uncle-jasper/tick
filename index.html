@@ -98,6 +98,7 @@ p{margin:0 0 12px}
 .g-note{font-size:12px;color:var(--dim);margin-top:8px}
 .g-note:empty{display:none}
 .goal.fail{border-color:#4a2f2f}
+.goal.wait{min-height:0;padding:18px;color:var(--dim);border-style:dashed;cursor:default}
 .goal.fail .box{color:var(--red)}
 .goal.chk{min-height:84px}
 
@@ -376,7 +377,10 @@ function syncBtn(){return D.refresh?'<button class="link syncline" data-act="syn
 function viewToday(){
   const gs=goalsList();
   if(!gs.length)return `<p class="dim">no goals yet.</p><button class="link" data-act="newgoal">+ add a goal</button><div class="foot">${syncBtn()}</div>`;
-  return gs.map(g=>isMark(g)
+  const tdy=today();
+  return gs.map(g=>g.created>tdy
+    ?`<div class="goal wait"><div class="g-top"><span class="g-name"><b class="box">[ ]</b> ${esc(g.name)}</span><span class="g-meta">starts ${dLabel(g.created)}</span></div></div>`
+    :isMark(g)
     ?`<button class="goal chk" data-act="chktoday" data-g="${g.id}"><div class="g-top"><span class="g-name"><b class="box">[ ]</b> ${esc(g.name)}</span><span class="g-meta"></span></div><div class="g-note"></div></button>`
     :`<button class="goal" data-act="toggle" data-g="${g.id}"><div class="g-top"><span class="g-name"><b class="box">[ ]</b> ${esc(g.name)}</span><span class="g-meta"></span></div><div class="g-clock"></div><div class="g-total"></div><div class="bar"><i></i></div></button>`).join('')
     +`<div class="foot"><button class="link" data-act="newgoal">+ goal</button></div><div class="foot" style="margin-top:8px">${syncBtn()}</div>`;
@@ -427,7 +431,7 @@ function viewGoals(){
       :g.kind==='check'?(e.times?'check off '+e.times+'x a week':'check off '+daysLabel(e.days))
       :e.times?(e.minutes?e.minutes+'m on ':'')+e.times+' days a week'
       :e.minutes?e.minutes+'m '+(e.pool?'total across ':'each ')+daysLabel(e.days):'tracked only';
-    return `<div class="grow"><button class="gedit" data-act="editgoal" data-g="${g.id}"><span>${esc(g.name)}</span><span class="dim small">${sum}</span></button><button class="mv" data-act="up" data-g="${g.id}"${i===0?' disabled':''} aria-label="move up">\u2191</button><button class="mv" data-act="down" data-g="${g.id}"${i===gl.length-1?' disabled':''} aria-label="move down">\u2193</button></div>`;
+    return `<div class="grow"><button class="gedit" data-act="editgoal" data-g="${g.id}"><span>${esc(g.name)}</span><span class="dim small">${sum}${g.created>today()?' \u00B7 starts '+dLabel(g.created):''}</span></button><button class="mv" data-act="up" data-g="${g.id}"${i===0?' disabled':''} aria-label="move up">\u2191</button><button class="mv" data-act="down" data-g="${g.id}"${i===gl.length-1?' disabled':''} aria-label="move down">\u2193</button></div>`;
   }).join('');
   const sync=D.refresh
     ?`<div>dropbox connected <span class="dim">${esc(D.path)}</span></div><div class="btns" style="margin-top:12px"><button data-act="sync">sync now</button><button class="danger" data-act="disc">disconnect</button></div><div class="dim small syncline" style="margin-top:12px"></div>`
@@ -503,6 +507,7 @@ function goalSheet(id){
   const g=id&&S.goals[id],kind=g?(g.kind||'timer'):'timer';
   const e=g?(entryFor(g,today())||g.history[g.history.length-1]):{minutes:30,days:[0,1,2,3,4,5,6],times:0};
   const mode=e.times>0?'count':(e.pool?'pool':'each');
+  const t0=today(),canMove=!g||g.created>=t0,startVal=g?g.created:t0;
   openSheet(`<h2>${g?'edit goal':'new goal'}</h2>
 <label for="g-name">name</label><input id="g-name" maxlength="24" autocomplete="off" autocapitalize="off" value="${g?esc(g.name):''}">
 ${g?'':`<label>type</label><div class="modes"><button class="kopt on" data-act="kindtog" data-k="timer">timer</button><button class="kopt" data-act="kindtog" data-k="check">check off</button><button class="kopt" data-act="kindtog" data-k="avoid">avoid</button><button class="kopt" data-act="kindtog" data-k="limit">limit</button></div><p class="dim small" id="kind-help" style="margin-top:8px">${KIND_HELP.timer}</p>`}
@@ -513,7 +518,8 @@ ${g?'':`<label>type</label><div class="modes"><button class="kopt on" data-act="
 <div class="modes mg-check"><button class="opt${mode==='count'?'':' on'}" data-act="modetog" data-m="each">set days</button><button class="opt${mode==='count'?' on':''}" data-act="modetog" data-m="count">x times a week</button></div>
 <p class="dim small" id="mode-help" style="margin-top:8px">${kind==='check'&&mode!=='count'?MODE_HELP.set:MODE_HELP[mode]}</p>
 <div class="only-count"><label for="g-times">times per week</label><input id="g-times" type="number" inputmode="numeric" min="1" max="7" value="${e.times||3}"></div></div>
-${g?'<p class="dim small" style="margin-top:14px">changes apply from today. past days keep the old settings.</p>':''}
+${canMove?`<label for="g-start">starts</label><input id="g-start" type="date" min="${t0}" value="${startVal}"><p class="dim small" style="margin-top:8px"><button class="link" data-act="startset" data-o="0">today</button> &nbsp; <button class="link" data-act="startset" data-o="1">tomorrow</button> &nbsp; pick tomorrow to leave today out.</p>`:''}
+${g&&!canMove?'<p class="dim small" style="margin-top:14px">changes apply from today. past days keep the old settings.</p>':''}
 <div class="err"></div>
 <div class="btns"><button class="go" data-act="savegoal" data-g="${g?g.id:''}">save</button><button data-act="close">cancel</button>${g?`<button class="danger" data-act="delgoal" data-g="${g.id}">delete</button>`:''}</div>`);
   sheet.dataset.kind=kind;sheet.dataset.mode=mode;
@@ -558,6 +564,35 @@ function connectSheet(){
 <div class="btns"><button class="go" data-act="docon">connect</button><button data-act="close">cancel</button></div>`);
 }
 
+/* ---------- level-up nudge ---------- */
+const BUMP_WEEKS=3;      // this many weeks of unbroken success earns the question
+const daysBetween=(a,b)=>Math.round((parseD(b)-parseD(a))/864e5);
+function nudgeFor(g){
+  if(g.deleted||(g.kind!=='timer'&&g.kind!=='limit'))return null;
+  const t=today();if(g.created>t)return null;
+  const e=entryFor(g,t);if(!e||!(e.minutes>0))return null;
+  if(g.kind==='limit'&&e.minutes<=5)return null;
+  if(g.nudgeAt&&daysBetween(g.nudgeAt,t)<BUMP_WEEKS*7)return null;                       // asked recently
+  if(daysBetween(g.history[g.history.length-1].from,t)<BUMP_WEEKS*7)return null;         // target changed recently
+  const s=streakOf(g),weekly=e.times>0||(g.kind==='timer'&&e.pool);
+  if(s.n<(weekly?BUMP_WEEKS:BUMP_WEEKS*e.days.length))return null;
+  const inc=Math.max(5,Math.round(e.minutes*0.1/5)*5);
+  const to=g.kind==='limit'?Math.max(5,e.minutes-inc):e.minutes+inc;
+  return to===e.minutes?null:{g,e,from:e.minutes,to};
+}
+function maybeNudge(){
+  if(!sheet.hidden||S.active.goalId||document.hidden)return;
+  for(const g of goalsList()){const n=nudgeFor(g);if(n){nudgeSheet(n);return;}}
+}
+function nudgeSheet(n){
+  const lim=n.g.kind==='limit';
+  openSheet(`<h2>${esc(n.g.name)}</h2>
+<p>${esc(streakText(n.g))}. you've been doing great!</p>
+<p>${lim?'lower the daily limit':'increase the duration of this goal'} from ${n.from}m to ${n.to}m?</p>
+<p class="dim small">it starts tomorrow, so today stays as it is. if you say no, i'll ask again in ${BUMP_WEEKS} weeks.</p>
+<div class="btns"><button class="go" data-act="nudgeyes" data-g="${n.g.id}">yes</button><button data-act="nudgeno" data-g="${n.g.id}">no</button></div>`);
+}
+
 /* ---------- click handling ---------- */
 const H={
   view(a){view=a.dataset.v;render();},
@@ -566,6 +601,7 @@ const H={
     if(S.active.goalId===id){
       const sid=stopActive();render();
       if(sid&&S.sessions[sid].end-S.sessions[sid].start>LONG_H*3600000)sessionSheet(sid,null,'long session \u2014 check the end time.');
+      else setTimeout(maybeNudge,500);
     }else{startGoal(id);render();}
   },
   newgoal(){goalSheet(null);},
@@ -579,6 +615,18 @@ const H={
     $('#min-label').textContent=a.dataset.k==='limit'?'daily limit, minutes':'daily target, minutes (0 = just track)';
     if(a.dataset.k==='limit'&&(+$('#g-min').value===0||+$('#g-min').value===30))$('#g-min').value=30;
     $('#mode-help').textContent=a.dataset.k==='check'?MODE_HELP.set:MODE_HELP.each;
+  },
+  startset(a){const d=addDays(today(),+a.dataset.o),i=$('#g-start');if(i)i.value=d;},
+  nudgeyes(a){
+    const g=S.goals[a.dataset.g],n=g&&nudgeFor(g);closeSheet();if(!n)return;
+    const t=today(),tm=addDays(t,1);
+    g.history=g.history.filter(x=>x.from<tm).concat({from:tm,minutes:n.to,days:n.e.days,pool:!!n.e.pool,times:n.e.times||0});
+    g.nudgeAt=t;g.updatedAt=Math.max(Date.now(),g.updatedAt+1);
+    save();render();flash(g.name+': '+n.to+'m from tomorrow',true);
+  },
+  nudgeno(a){
+    const g=S.goals[a.dataset.g];closeSheet();if(!g)return;
+    g.nudgeAt=today();g.updatedAt=Math.max(Date.now(),g.updatedAt+1);save();render();
   },
   chktoday(a){const id=a.dataset.g,t=today();setCheck(id,t,!isDone(id,t));render();},
   chk(a){setCheck(a.dataset.g,a.dataset.d,!isDone(a.dataset.g,a.dataset.d));render();if(dayCtx&&sheetIsDay)daySheet(dayCtx);},
@@ -628,7 +676,12 @@ const H={
       else{days=picked();if(!days.length)return sheetErr('pick at least one day');pool=mode==='pool'&&kind==='timer';}
     }
     if(kind==='check'||kind==='avoid')minutes=0;
-    if(!g){const id='g'+rid();S.goals[id]={id,name,kind,created:t,order:now,history:[{from:t,minutes,days,pool,times}],updatedAt:now};}
+    const stEl=$('#g-start');let start=t;
+    if(stEl){start=stEl.value;if(!ISO.test(start)||start<t)return sheetErr('pick today or a later date');}
+    if(!g){const id='g'+rid();S.goals[id]={id,name,kind,created:start,order:now,history:[{from:start,minutes,days,pool,times}],updatedAt:now};}
+    else if(g.created>=t){   // hasn't started yet (or starts today): the whole setup can change freely
+      g.name=name;g.created=start;g.history=[{from:start,minutes,days,pool,times}];g.updatedAt=Math.max(now,g.updatedAt+1);
+    }
     else{
       const cur=entryFor(g,t)||{days:[]};
       const same=cur.minutes===minutes&&!!cur.pool===pool&&(cur.times||0)===times&&[...cur.days].sort().join()===[...days].sort().join();
@@ -690,7 +743,7 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('change',e=>{
   if(e.target.id==='keep'){
-    const n=Math.min(365,Math.max(7,parseInt(e.target.value,10)||60));e.target.value=n;
+    const n=Math.min(3650,Math.max(7,parseInt(e.target.value,10)||S.meta.keepDays));e.target.value=n;
     S.meta={keepDays:n,updatedAt:Math.max(Date.now(),S.meta.updatedAt+1)};prune();save();
   }
 });
@@ -884,9 +937,10 @@ async function oauthReturn(){
   prune();render();
   setInterval(tick,1000);
   setInterval(()=>{if(!document.hidden)sync();},20000);
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden){curDay=today();softRender();sync();}});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){curDay=today();softRender();sync();setTimeout(maybeNudge,1500);}});
   window.addEventListener('online',()=>sync());
   sync();
+  setTimeout(maybeNudge,1500);
   if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
 })();
